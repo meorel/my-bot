@@ -1,112 +1,117 @@
-import os
 import yfinance as yf
 import pandas as pd
-import matplotlib.pyplot as plt
-import mplfinance as mpf
-import io
 import requests
 import time
 from flask import Flask
 from threading import Thread
 
-# שרת לשמירה על הבוט חי ב-Render
-app = Flask('')
-@app.route('/')
-def home(): return "Trading Bot 24/7 is Active"
-
-def run_web():
-    app.run(host='0.0.0.0', port=8080)
-
+# --- הגדרות מערכת ---
 TOKEN = "8456706482:AAFUhE3sdD7YZh4ESz1Mr4V15zYYLXgYtuM"
 CHAT_ID = "605543691"
+
+app = Flask('')
+@app.route('/')
+def home(): return "Fully Automated Professional Scanner Active"
 
 def send_msg(text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     requests.get(url, params={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"})
 
-def get_comprehensive_analysis(symbol):
+def get_sp500():
     try:
-        # 1. משיכת נתונים (מניה + שוק)
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period="1y")
-        spy = yf.Ticker("SPY").history(period="1y")
-        
-        if df.empty or len(df) < 150:
-            return f"❌ לא נמצאו מספיק נתונים עבור {symbol}. נסה סימול מוכר יותר."
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        return pd.read_html(url)[0]['Symbol'].tolist()
+    except: return ['AAPL', 'NVDA', 'TSLA', 'MSFT', 'META', 'GOOGL', 'AMZN']
 
-        # 2. חישובים טכניים
+# רשימת מעקב מורחבת (ישראל, סחורות, קריפטו)
+WATCHLIST = [
+    'LUMI.TA', 'POLI.TA', 'BEZQ.TA', 'NICE.TA', 'ICL.TA', 'MNDY', 'ELTK',
+    'GC=F', 'SI=F', 'CL=F', 'BTC-USD', 'ETH-USD', 'SOL-USD'
+]
+
+def analyze_full_engine(symbol, spy_perf):
+    try:
+        df = yf.download(symbol, period="1y", interval="1d", progress=False)
+        if len(df) < 200: return None
+        
+        # חישוב אינדיקטורים
         df['SMA50'] = df['Close'].rolling(window=50).mean()
         df['SMA150'] = df['Close'].rolling(window=150).mean()
+        df['SMA200'] = df['Close'].rolling(window=200).mean()
         df['Vol_Avg'] = df['Volume'].rolling(window=20).mean()
         
-        last_price = df['Close'].iloc[-1]
-        sma50 = df['SMA50'].iloc[-1]
-        sma150 = df['SMA150'].iloc[-1]
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+        score = 0
+        details = []
+
+        # 1. צלבים (3 נק')
+        if prev['SMA50'] <= prev['SMA200'] and last['SMA50'] > last['SMA200']:
+            score += 3
+            details.append("🌟 צלב זהב (50/200)")
         
-        # 3. זיהוי צלבים (זהב/מוות)
-        prev_sma50 = df['SMA50'].iloc[-2]
-        prev_sma150 = df['SMA150'].iloc[-2]
-        if prev_sma50 <= prev_sma150 and sma50 > sma150: cross = "🌟 **צלב זהב (איתות קניה חזק!)**"
-        elif prev_sma50 >= prev_sma150 and sma50 < sma150: cross = "💀 **צלב מוות (איתות מכירה!)**"
-        else: cross = "⚖️ אין חצייה טרייה"
+        # 2. מגמת 150 (2 נק')
+        if last['Close'] > last['SMA150']:
+            score += 2
+            details.append("📈 מגמה חיובית (מעל 150)")
 
-        # 4. כוס וידית ופריצות
-        year_high = df['High'].max()
-        if last_price >= year_high * 0.95: structure = "☕ מבנה 'כוס וידית' / פריצת שיא"
-        elif last_price > sma50 and last_price > sma150: structure = "📈 מומנטום חיובי"
-        else: structure = "📉 מבנה דל"
+        # 3. מבנה כוס וידית / פריצה (2 נק')
+        high_1y = df['High'].max()
+        if last['Close'] >= high_1y * 0.95:
+            score += 2
+            details.append("☕ מבנה כוס וידית / פריצת שיא")
 
-        # 5. חוזק יחסי מול ה-S&P 500
-        stock_perf = (df['Close'].iloc[-1] / df['Close'].iloc[-21]) - 1
-        spy_perf = (spy['Close'].iloc[-1] / spy['Close'].iloc[-21]) - 1
-        rs = "💪 חזקה מהשוק" if stock_perf > spy_perf else "🔌 חלשה מהשוק"
+        # 4. ווליום חריג (1.5 נק')
+        if last['Volume'] > last['Vol_Avg'] * 1.5:
+            score += 1.5
+            details.append("🔥 ווליום חריג")
 
-        # 6. ניתוח מחזורים
-        vol_ratio = df['Volume'].iloc[-1] / df['Vol_Avg'].iloc[-1]
-        vol_desc = "🔥 מחזור חריג!" if vol_ratio > 1.5 else "📊 מחזור תקין"
+        # 5. חוזק יחסי RS (1.5 נק')
+        stock_perf = (last['Close'] / df['Close'].iloc[-21]) - 1
+        if stock_perf > spy_perf:
+            score += 1.5
+            details.append("💪 חוזק יחסי (חזקה מהשוק)")
 
-        # 7. יצירת הגרף (60 ימים אחרונים)
-        buf = io.BytesIO()
-        ap = mpf.make_addplot(df[['SMA50', 'SMA150']].tail(60))
-        mpf.plot(df.tail(60), type='candle', style='charles', addplot=ap,
-                 title=f"\n{symbol} - Full Report", savefig=dict(fname=buf, format='png'))
-        buf.seek(0)
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={'chat_id': CHAT_ID}, files={'photo': buf})
+        # תמיכה והתנגדות (למידע בלבד)
+        support = df['Low'].tail(20).min()
+        resistance = df['High'].tail(20).max()
 
-        # 8. הרכבת ההודעה
-        status_150 = "✅ מעל ממוצע 150 (לונג)" if last_price > sma150 else "❌ מתחת לממוצע 150 (שורט)"
-        stop_loss = last_price * 0.96
+        if score >= 7: # רק איתותים באמינות גבוהה
+            msg = (f"🚀 **איתות עוצמתי זוהה: {symbol}**\n"
+                   f"🏆 **ציון חוזק: {score}/10**\n"
+                   f"💰 מחיר: `{last['Close']:.2f}$`\n"
+                   f"------------------\n"
+                   f"🔍 אינדיקטורים שהתקיימו:\n" + "\n".join(details) + "\n"
+                   f"------------------\n"
+                   f"🧱 התנגדות (20 יום): `{resistance:.2f}`\n"
+                   f"⚓ תמיכה (20 יום): `{support:.2f}`\n"
+                   f"🛡️ **סטופ לוס (4%): `{last['Close']*0.96:.2f}`**")
+            return msg
+        return None
+    except: return None
 
-        msg = (f"💎 *דו''ח ניתוח מלא: {symbol}*\n"
-               f"--------------------------\n"
-               f"💰 מחיר נוכחי: `{last_price:.2f}$`\n"
-               f"📊 מגמה ראשית: {status_150}\n"
-               f"⚡ איתות: {cross}\n"
-               f"🏗️ מבנה מחיר: {structure}\n"
-               f"🌎 מול השוק: {rs}\n"
-               f"📈 ווליום: {vol_desc}\n"
-               f"🛡️ **סטופ לוס (4%): `{stop_loss:.2f}$`**\n"
-               f"--------------------------\n"
-               f"📏 SMA 50: `{sma50:.2f}`\n"
-               f"📏 SMA 150: `{sma150:.2f}`")
-        return msg
-    except Exception as e: return f"⚠️ שגיאה בניתוח {symbol}: המערכת לא זיהתה את הסימול."
-
-def main():
-    last_id = 0
-    send_msg("🚀 *הבוט המקצועי מוכן ב-Render!* \nשלח סימול (למשל: NVDA, GC=F, ETH-USD)")
+def automation_loop():
     while True:
         try:
-            updates = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={last_id+1}&timeout=20").json()
-            if updates.get("result"):
-                for u in updates["result"]:
-                    last_id = u["update_id"]
-                    if "message" in u and "text" in u["message"]:
-                        ticker = u["message"]["text"].upper().strip()
-                        send_msg(f"🧐 סורק את `{ticker}` לעומק...")
-                        send_msg(get_comprehensive_analysis(ticker))
-        except: time.sleep(5)
+            send_msg("🛰️ **סורק ה-AI נכנס לסבב ניתוח עומק על כל השוק...**")
+            # חישוב ביצועי שוק להשוואת RS
+            spy = yf.download('SPY', period="1y", progress=False)
+            spy_perf = (spy['Close'].iloc[-1] / spy['Close'].iloc[-21]) - 1
+            
+            full_list = get_sp500() + WATCHLIST
+            found = 0
+            for s in full_list:
+                s = s.replace('.', '-') if '-' not in s else s
+                res = analyze_full_engine(s, spy_perf)
+                if res:
+                    send_msg(res)
+                    found += 1
+                time.sleep(0.6) # מניעת חסימה מ-Yahoo
+            
+            send_msg(f"✅ סבב הסריקה הסתיים. נמצאו {found} איתותים בציון גבוה.")
+            time.sleep(3600) # סריקה כל שעה
+        except: time.sleep(60)
 
 if __name__ == "__main__":
-    Thread(target=run_web).start()
-    main()
+    Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
+    automation_loop()
