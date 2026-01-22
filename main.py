@@ -8,13 +8,13 @@ import numpy as np
 from flask import Flask
 from threading import Thread
 
-# --- הגדרות ---
+# --- הגדרות מערכת ---
 TOKEN = "8456706482:AAFUhE3sdD7YZh4ESz1Mr4V15zYYLXgYtuM"
 CHAT_ID = "605543691"
 
 app = Flask('')
 @app.route('/')
-def home(): return "AI Trader Pro is LIVE"
+def home(): return "AI Trader Pro - Group Scanning Active"
 
 def send_msg(text):
     try: requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=10)
@@ -22,26 +22,26 @@ def send_msg(text):
 
 def send_plot(symbol, df, caption, levels=None):
     try:
-        plt.figure(figsize=(12, 6))
-        # גרף מחיר וממוצעים 50, 150, 200
-        plt.plot(df.index[-120:], df['Close'].tail(120), label='Price', color='black', linewidth=1.5)
-        plt.plot(df.index[-120:], df['SMA50'].tail(120), label='SMA 50', color='blue', alpha=0.6)
-        plt.plot(df.index[-120:], df['SMA150'].tail(120), label='SMA 150', color='orange', alpha=0.6)
-        plt.plot(df.index[-120:], df['SMA200'].tail(120), label='SMA 200', color='red', linewidth=2)
+        plt.figure(figsize=(12, 7))
+        # גרף מחיר וממוצעים
+        plt.plot(df.index[-150:], df['Close'].tail(150), label='Price', color='black', linewidth=1.5)
+        plt.plot(df.index[-150:], df['SMA50'].tail(150), label='SMA 50', color='blue', alpha=0.6)
+        plt.plot(df.index[-150:], df['SMA150'].tail(150), label='SMA 150', color='orange', alpha=0.6)
+        plt.plot(df.index[-150:], df['SMA200'].tail(150), label='SMA 200', color='red', linewidth=2)
         
         if levels:
             for l in levels:
                 plt.axhline(y=l, color='gray', linestyle='--', alpha=0.3)
 
         plt.title(f"Detailed Analysis: {symbol}")
-        plt.legend()
+        plt.legend(loc='upper left')
         plt.grid(True, alpha=0.1)
         
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=100)
+        plt.savefig(buf, format='png', dpi=110)
         buf.seek(0)
         plt.close()
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={'chat_id': CHAT_ID, 'caption': caption, 'parse_mode': 'Markdown'}, files={'photo': buf}, timeout=20)
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={'chat_id': CHAT_ID, 'caption': caption, 'parse_mode': 'Markdown'}, files={'photo': buf}, timeout=25)
     except: pass
 
 def analyze_pro(symbol, spy_perf, min_score=3):
@@ -61,21 +61,18 @@ def analyze_pro(symbol, spy_perf, min_score=3):
         score = 0
         details = []
 
-        # שיטת ניקוד קבועה ואמינה
+        # ניקוי וחישוב ניקוד
         if last_p > df['SMA50'].iloc[-1]: score += 2; details.append("✅ מעל SMA50")
         if last_p > df['SMA150'].iloc[-1]: score += 2; details.append("✅ מעל SMA150")
-        if last_p > df['SMA200'].iloc[-1]: score += 3; details.append("✅ מעל SMA200 (מגמה)")
+        if last_p > df['SMA200'].iloc[-1]: score += 3; details.append("✅ מעל SMA200")
         
-        # חוזק יחסי
         perf_1m = (last_p / float(close.iloc[-21])) - 1
-        if perf_1m > spy_perf: score += 3; details.append("💪 חוזק יחסי חיובי")
+        if perf_1m > spy_perf: score += 3; details.append("💪 חזקה מהשוק")
 
-        # תמיכה והתנגדות שנתיים
         sup = float(df['Low'].tail(252).min())
         res = float(df['High'].tail(252).max())
         
-        # בדיקת שבירה
-        is_breakdown = last_p < float(df['Low'].tail(10).min()) * 1.01
+        is_breakdown = last_p < float(df['Low'].tail(15).min()) * 1.005
 
         if score >= min_score or is_breakdown:
             rec = "🔴 מכירה דחופה" if is_breakdown else ("💎 קנייה" if score >= 8 else "⚖️ מעקב")
@@ -89,25 +86,33 @@ def analyze_pro(symbol, spy_perf, min_score=3):
     except: return None, 0, "", []
 
 def scanner():
+    # חלוקה לקבוצות לסריקה חכמה
+    groups = [
+        ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL'], # טכנולוגיה 1
+        ['AMZN', 'META', 'NFLX', 'AMD', 'AVGO'],  # טכנולוגיה 2
+        ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA'], # בנקים ישראל
+        ['BEZQ.TA', 'ICL.TA', 'NICE.TA', 'AZRG.TA'], # ישראל נוספות
+        ['BTC-USD', 'ETH-USD', 'GC=F', 'CL=F', 'SI=F'] # קריפטו וסחורות
+    ]
+    
+    current_group = 0
     while True:
         try:
             spy = yf.download('SPY', period="1y", progress=False)['Close'].squeeze()
             if isinstance(spy, pd.DataFrame): spy = spy.iloc[:, 0]
             spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[-21])) - 1
             
-            # רשימת מניות מגוונת שנסרקת בלולאה יציבה
-            tickers = ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NFLX', 'AMD', 'COST', 
-                       'LUMI.TA', 'POLI.TA', 'BEZQ.TA', 'ICL.TA', 'NICE.TA', 'DSCT.TA', 'BTC-USD', 'GC=F']
+            tickers = groups[current_group]
+            send_msg(f"🛰️ סורק אוטומטי: מתחיל סבב קבוצה {current_group + 1}...")
             
-            send_msg(f"🛰️ סורק אוטומטי התחיל סבב על {len(tickers)} נכסים...")
             for s in tickers:
                 df, score, msg, lvls = analyze_pro(s.replace('.', '-'), spy_perf)
                 if df is not None:
                     send_plot(s, df, msg, lvls)
-                time.sleep(3) # מנוחה ארוכה יותר כדי למנוע קריסה
+                time.sleep(3)
             
-            send_msg("✅ סבב סריקה הושלם.")
-            time.sleep(3600)
+            current_group = (current_group + 1) % len(groups) # עובר לקבוצה הבאה
+            time.sleep(600) # מנוחה של 10 דקות בין קבוצות
         except: time.sleep(60)
 
 def listen():
