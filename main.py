@@ -8,34 +8,32 @@ import numpy as np
 from flask import Flask
 from threading import Thread
 
-# --- הגדרות מערכת ---
+# --- הגדרות ---
 TOKEN = "8456706482:AAFUhE3sdD7YZh4ESz1Mr4V15zYYLXgYtuM"
 CHAT_ID = "605543691"
 
 app = Flask('')
 @app.route('/')
-def home(): return "AI Trader Pro - Multisector Scanning Active"
+def home(): return "AI Master Scanner Active"
 
 def send_msg(text):
     try: requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=10)
     except: pass
 
-def send_plot(symbol, df, caption, levels=None):
+def send_plot(symbol, df, caption, sup, res):
     try:
         plt.figure(figsize=(12, 7))
-        # גרף מחיר וממוצעים 50, 150, 200
-        plt.plot(df.index[-150:], df['Close'].tail(150), label='Price', color='black', linewidth=1.5)
+        prices = df['Close'].tail(150)
+        plt.plot(df.index[-150:], prices, label='Price', color='black', linewidth=1.5)
         plt.plot(df.index[-150:], df['SMA50'].tail(150), label='SMA 50', color='blue', alpha=0.6)
-        plt.plot(df.index[-150:], df['SMA150'].tail(150), label='SMA 150', color='orange', alpha=0.6)
         plt.plot(df.index[-150:], df['SMA200'].tail(150), label='SMA 200', color='red', linewidth=2)
         
-        if levels:
-            for l in levels:
-                plt.axhline(y=l, color='gray', linestyle='--', alpha=0.3)
+        plt.axhline(y=sup, color='green', linestyle='--', alpha=0.5, label='Support')
+        plt.axhline(y=res, color='red', linestyle='--', alpha=0.5, label='Resistance')
 
-        plt.title(f"Detailed Analysis: {symbol}", fontsize=14)
-        plt.grid(True, alpha=0.1)
+        plt.title(f"AI Analysis: {symbol}")
         plt.legend(loc='best')
+        plt.grid(True, alpha=0.1)
         
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=110)
@@ -44,10 +42,44 @@ def send_plot(symbol, df, caption, levels=None):
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={'chat_id': CHAT_ID, 'caption': caption, 'parse_mode': 'Markdown'}, files={'photo': buf}, timeout=25)
     except: pass
 
-def analyze_pro(symbol, spy_perf, min_score=3):
+def detect_patterns(df):
+    patterns = []
+    close = df['Close'].tail(60).values
+    lows = df['Low'].tail(60).values
+    highs = df['High'].tail(60).values
+    
+    # תחתית כפולה (Double Bottom)
+    if len(lows) > 40:
+        min1 = np.min(lows[:20])
+        min2 = np.min(lows[20:])
+        if abs(min1 - min2) / min1 < 0.015:
+            patterns.append("📉 תחתית כפולה (Double Bottom)")
+            
+    # פסגה כפולה (Double Top)
+    if len(highs) > 40:
+        max1 = np.max(highs[:20])
+        max2 = np.max(highs[20:])
+        if abs(max1 - max2) / max1 < 0.015:
+            patterns.append("📈 פסגה כפולה (Double Top)")
+
+    # זיהוי גאפים (Gaps) - בודק את היום האחרון מול שלשום
+    if len(df) > 2:
+        last_open = df['Open'].iloc[-1]
+        prev_close = df['Close'].iloc[-2]
+        gap_pct = (last_open - prev_close) / prev_close
+        if gap_pct > 0.01: patterns.append(f"🚀 גאפ פריצה למעלה ({gap_pct:.1%})")
+        elif gap_pct < -0.01: patterns.append(f"⚠️ גאפ ירידה למטה ({gap_pct:.1%})")
+    
+    # צלבים
+    if df['SMA50'].iloc[-1] > df['SMA200'].iloc[-1] and df['SMA50'].iloc[-2] <= df['SMA200'].iloc[-2]:
+        patterns.append("🌟 צלב זהב (Golden Cross)")
+        
+    return patterns
+
+def analyze_master(symbol, spy_perf):
     try:
-        data = yf.download(symbol, period="2y", interval="1d", progress=False)
-        if data.empty or len(data) < 200: return None, 0, "", []
+        data = yf.download(symbol, period="2y", progress=False)
+        if data.empty or len(data) < 200: return None
         
         df = data.copy()
         if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
@@ -58,63 +90,52 @@ def analyze_pro(symbol, spy_perf, min_score=3):
         df['SMA200'] = close.rolling(200).mean()
         
         last_p = float(close.iloc[-1])
+        sup = float(df['Low'].tail(200).min())
+        res = float(df['High'].tail(200).max())
+        
+        patterns = detect_patterns(df)
         score = 0
-        details = []
-
-        # ניקוד קבוע
-        if last_p > df['SMA50'].iloc[-1]: score += 2; details.append("✅ מעל SMA50")
-        if last_p > df['SMA150'].iloc[-1]: score += 2; details.append("✅ מעל SMA150")
-        if last_p > df['SMA200'].iloc[-1]: score += 3; details.append("✅ מעל SMA200")
+        if last_p > df['SMA50'].iloc[-1]: score += 3
+        if last_p > df['SMA200'].iloc[-1]: score += 3
+        if (last_p / float(close.iloc[-21])) - 1 > spy_perf: score += 4
         
-        perf_1m = (last_p / float(close.iloc[-21])) - 1
-        if perf_1m > spy_perf: score += 3; details.append("💪 חוזק יחסי חיובי")
-
-        # רמות תמיכה/התנגדות שנתיות
-        sup = float(df['Low'].tail(252).min())
-        res = float(df['High'].tail(252).max())
+        sl = max(sup * 0.98, last_p * 0.95)
         
-        is_breakdown = last_p < float(df['Low'].tail(15).min()) * 1.005
-
-        if score >= min_score or is_breakdown:
-            rec = "🔴 מכירה דחופה" if is_breakdown else ("💎 קנייה" if score >= 8 else "⚖️ מעקב")
-            msg = (f"🔍 **{symbol} | Pro Score: {score}/10**\n"
-                   f"📢 המלצה: *{rec}*\n"
+        if score >= 6 or patterns:
+            pattern_txt = "\n".join(patterns) if patterns else "אין תבנית מיוחדת"
+            msg = (f"🎯 **{symbol} | Pro Score: {score}/10**\n"
+                   f"📊 תבניות: {pattern_txt}\n"
                    f"💰 מחיר: `{last_p:.2f}`\n"
-                   f"📏 שיא שנתי: `{res:.2f}` | ⚓ שפל שנתי: `{sup:.2f}`\n"
-                   f"------------------\n" + "\n".join(details))
-            return df, score, msg, [sup, res]
-        return None, 0, "", []
-    except: return None, 0, "", []
+                   f"🛑 סטופ לוס: `{sl:.2f}`\n"
+                   f"📏 התנגדות: `{res:.2f}` | ⚓ תמיכה: `{sup:.2f}`")
+            return df, msg, sup, res
+        return None
+    except: return None
 
 def scanner():
-    # קבוצות מניות לסריקה מדורגת
-    groups = [
-        ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL'], 
-        ['AMZN', 'META', 'NFLX', 'AMD', 'AVGO'],  
-        ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA'], 
-        ['BEZQ.TA', 'ICL.TA', 'NICE.TA', 'AZRG.TA'], 
-        ['BTC-USD', 'ETH-USD', 'GC=F', 'CL=F']
-    ]
+    groups = {
+        "נאסד\"ק 100": ['AAPL', 'MSFT', 'AMZN', 'NVDA', 'GOOGL', 'META', 'TSLA', 'AVGO', 'COST', 'NFLX'],
+        "ישראל - מדדים": ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'ICL.TA', 'NICE.TA', 'BEZQ.TA'],
+        "סחורות": ['GC=F', 'CL=F', 'SI=F', 'NG=F', 'HG=F'], # זהב, נפט, כסף, גז, נחושת
+        "קריפטו": ['BTC-USD', 'ETH-USD', 'SOL-USD', 'ADA-USD', 'XRP-USD'],
+        "S&P 500": ['BRK-B', 'LLY', 'V', 'JPM', 'UNH', 'MA', 'WMT', 'PG']
+    }
     
-    current_group = 0
     while True:
-        try:
-            spy = yf.download('SPY', period="1y", progress=False)['Close'].squeeze()
-            if isinstance(spy, pd.DataFrame): spy = spy.iloc[:, 0]
-            spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[-21])) - 1
-            
-            tickers = groups[current_group]
-            send_msg(f"🛰️ **סורק:** סבב קבוצה {current_group + 1} יוצא לדרך...")
-            
-            for s in tickers:
-                df, score, msg, lvls = analyze_pro(s.replace('.', '-'), spy_perf)
-                if df is not None:
-                    send_plot(s, df, msg, lvls)
-                time.sleep(3)
-            
-            current_group = (current_group + 1) % len(groups)
-            time.sleep(600) # מנוחה של 10 דקות בין סבבים
-        except: time.sleep(60)
+        for name, tickers in groups.items():
+            try:
+                spy = yf.download('SPY', period="1y", progress=False)['Close']
+                if isinstance(spy, pd.DataFrame): spy = spy.iloc[:, 0]
+                spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[-21])) - 1
+                
+                send_msg(f"⏳ **מתחיל סריקת סקטור: {name}**")
+                for s in tickers:
+                    res = analyze_master(s.replace('.', '-'), spy_perf)
+                    if res: send_plot(s, res[0], res[1], res[2], res[3])
+                    time.sleep(5)
+                
+                time.sleep(600) # המתנה של 10 דקות בין קבוצה לקבוצה
+            except: time.sleep(60)
 
 def listen():
     last_id = 0
@@ -126,12 +147,11 @@ def listen():
                 last_id = u["update_id"]
                 if "message" in u and "text" in u["message"]:
                     t = u["message"]["text"].upper().strip()
-                    spy = yf.download('SPY', period="1y", progress=False)['Close'].squeeze()
+                    spy = yf.download('SPY', period="1y", progress=False)['Close']
                     if isinstance(spy, pd.DataFrame): spy = spy.iloc[:, 0]
                     spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[-21])) - 1
-                    df, score, msg, lvls = analyze_pro(t, spy_perf, min_score=0)
-                    if df is not None: send_plot(t, df, msg, lvls)
-                    else: send_msg(f"❌ לא נמצאו נתונים עבור {t}")
+                    res = analyze_master(t, spy_perf)
+                    if res: send_plot(t, res[0], res[1], res[2], res[3])
         except: time.sleep(2)
 
 if __name__ == "__main__":
