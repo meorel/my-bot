@@ -16,7 +16,7 @@ app = Flask('')
 sent_alerts = {} 
 
 @app.route('/')
-def home(): return "Professional Strategic Scanner Active"
+def home(): return "Scanner Fixed - Ultimate Stability Mode"
 
 def send_msg(text):
     try: requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=15)
@@ -32,7 +32,7 @@ def send_plot(symbol, name, df, caption, sup, res):
         plt.plot(df.index[-120:], df['SMA200'].tail(120), label='SMA 200', color='red', linewidth=1.5)
         plt.axhline(y=sup, color='green', linestyle='--', alpha=0.6)
         plt.axhline(y=res, color='red', linestyle='--', alpha=0.6)
-        plt.title(f"{name} ({symbol})")
+        plt.title(f"{name}")
         plt.legend()
         buf = io.BytesIO()
         plt.savefig(buf, format='png')
@@ -40,19 +40,21 @@ def send_plot(symbol, name, df, caption, sup, res):
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={'chat_id': CHAT_ID, 'caption': caption, 'parse_mode': 'Markdown'}, files={'photo': buf}, timeout=30)
     except: pass
 
-def get_full_lists():
-    israel = ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA', 'AZRG.TA', 'BEZQ.TA', 'NICE.TA', 'ICL.TA', 'ESLT.TA', 'AFCON.TA', 'ORL.TA', 'HRL.TA', 'TEVA.TA', 'DELEKG.TA', 'ENOG.TA', 'NWMD.TA', 'ALHE.TA', 'MTRX.TA', 'SPNS.TA']
-    others = ['GC=F', 'CL=F', 'SI=F', '^TA35.TA', '^TA125.TA', 'BTC-USD', 'ETH-USD']
-    try:
-        sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', timeout=10)[0]['Symbol'].tolist()
-        return sorted(list(set(sp500 + israel + others)))
-    except:
-        return sorted(list(set(israel + others)))
+def get_static_list():
+    # רשימה יציבה שלא תלויה באתרים חיצוניים
+    israel = ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA', 'AZRG.TA', 'BEZQ.TA', 'NICE.TA', 'ICL.TA', 'ESLT.TA', 'AFCON.TA', 'ORL.TA', 'HRL.TA', 'TEVA.TA', 'DELEKG.TA', 'ENOG.TA', 'NWMD.TA', 'ALHE.TA', 'MTRX.TA', 'SPNS.TA', 'AMOT.TA', 'MELIS.TA']
+    commodities = ['GC=F', 'CL=F', 'SI=F', '^TA35.TA', '^TA125.TA', 'BTC-USD', 'ETH-USD']
+    usa_major = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NFLX', 'AMD', 'INTC', 'PYPL', 'DIS', 'BA', 'JPM', 'V', 'MA', 'COST', 'WMT', 'LLY', 'AVGO', 'CRM', 'ORCL', 'ADBE', 'NKE', 'PLTR', 'NBR']
+    # כאן ניתן להוסיף עוד מאות מניות ידנית במידת הצורך
+    return sorted(list(set(israel + commodities + usa_major)))
 
-def get_clean_name(symbol, t_info):
-    h_names = {'GC=F': 'זהב', 'CL=F': 'נפט', 'SI=F': 'כסף', 'BTC-USD': 'ביטקוין', 'ETH-USD': 'איתריום', '^TA35.TA': 'ת"א 35', '^TA125.TA': 'ת"א 125'}
-    name = h_names.get(symbol, t_info.get('longName', symbol))
-    return f"{name} ({symbol})"
+def get_clean_name(symbol):
+    names = {'GC=F': 'זהב (Gold)', 'CL=F': 'נפט (Crude Oil)', 'SI=F': 'כסף (Silver)', 'BTC-USD': 'ביטקוין', 'ETH-USD': 'איתריום', '^TA35.TA': 'מדד ת"א 35', '^TA125.TA': 'מדד ת"א 125'}
+    if symbol in names: return names[symbol]
+    try:
+        info = yf.Ticker(symbol).info
+        return f"{info.get('longName', symbol)} ({symbol})"
+    except: return symbol
 
 def analyze_strategy(symbol, spy_perf, my_price=None, is_auto=False):
     try:
@@ -62,11 +64,9 @@ def analyze_strategy(symbol, spy_perf, my_price=None, is_auto=False):
         
         last_p = float(df['Close'].iloc[-1])
         
-        # לוגיקת עדכונים חשובים: שלח שוב רק אם המחיר זז ב-2%
+        # עדכון רק אם המחיר זז ב-3% (מונע ספאם)
         if is_auto and symbol in sent_alerts:
-            prev_p = sent_alerts[symbol]['price']
-            if abs((last_p - prev_p) / prev_p) < 0.02:
-                return None
+            if abs((last_p - sent_alerts[symbol]) / sent_alerts[symbol]) < 0.03: return None
 
         df['SMA50'] = df['Close'].rolling(50).mean()
         df['SMA150'] = df['Close'].rolling(150).mean()
@@ -89,9 +89,9 @@ def analyze_strategy(symbol, spy_perf, my_price=None, is_auto=False):
         if my_price:
             profit = (last_p - my_price) / my_price
             personal = f"\n\n💬 **ייעוץ אישי:** קנית ב-{my_price:.2f} ({profit:.1%}). "
-            personal += "המגמה תומכת - להחזיק." if score >= 7 else "זהירות - המגמה נחלשת, שקול יציאה."
+            personal += "המגמה תומכת - להחזיק." if score >= 7 else "זהירות - מגמה נחלשת."
 
-        name = get_clean_name(symbol, ticker.info)
+        name = get_clean_name(symbol)
         msg = (f"🎯 **{name} | ציון: {score}/10**\n"
                f"📢 **מסקנה:** {rec}\n\n"
                f"📍 ממוצע 50: `{s50:.2f}` ({'✅' if last_p > s50 else '❌'})\n"
@@ -100,34 +100,29 @@ def analyze_strategy(symbol, spy_perf, my_price=None, is_auto=False):
                f"💰 מחיר: `{last_p:.2f}` | 🛑 סטופ: `{min(df['Low'].tail(20).min()*0.99, last_p*0.95):.2f}`\n"
                f"📏 התנגדות: `{res:.2f}` | ⚓ תמיכה: `{sup:.2f}`{personal}")
         
-        if is_auto: sent_alerts[symbol] = {'price': last_p, 'time': datetime.now()}
+        if is_auto: sent_alerts[symbol] = last_p
         return df, msg, sup, res, name
     except: return None
 
 def scanner():
-    time.sleep(10)
     while True:
-        all_tickers = get_full_lists()
-        send_msg(f"🚀 **מתחיל סבב סריקה על {len(all_tickers)} ניירות ערך.**")
-        found = 0
+        all_tickers = get_static_list()
+        send_msg(f"🚀 **מתחיל סריקה על {len(all_tickers)} ניירות ערך.**")
         try:
             spy = yf.download('SPY', period="1mo", progress=False)['Close'].squeeze()
             spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[0])) - 1
         except: spy_perf = 0
         
-        for idx, s in enumerate(all_tickers):
+        for s in all_tickers:
             if ".TA" in s and datetime.now().weekday() in [4, 5]: continue
-            if idx > 0 and idx % 100 == 0: send_msg(f"⏳ סרקתי {idx} מניות...")
-            
             res = analyze_strategy(s.replace('.', '-'), spy_perf, is_auto=True)
             if res:
                 send_plot(s, res[4], res[0], res[1], res[2], res[3])
-                found += 1
-                time.sleep(5)
+                time.sleep(10)
             time.sleep(1.2)
         
-        send_msg(f"✅ **סבב הושלם.** נסרקו {len(all_tickers)} ניירות, נמצאו {found} איתותים.")
-        time.sleep(600)
+        send_msg(f"✅ סבב מלא הושלם.")
+        time.sleep(1800)
 
 def listen():
     last_id = 0
@@ -138,6 +133,8 @@ def listen():
                 last_id = u["update_id"]
                 if "message" in u and "text" in u["message"]:
                     txt = u["message"]["text"].upper().strip()
+                    send_msg(f"⏳ מנתח עבורך את {txt}...") # אישור קבלה מיידי
+                    
                     try:
                         spy = yf.download('SPY', period="1mo", progress=False)['Close'].squeeze()
                         spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[0])) - 1
@@ -149,9 +146,9 @@ def listen():
                     else:
                         res = analyze_strategy(txt, spy_perf, is_auto=False)
                     
-                    if res: send_plot(txt.split()[-1], res[4], res[0], res[1], res[2], res[3])
-                    else: send_msg(f"❌ לא נמצאו נתונים עבור {txt}")
-        except: time.sleep(5)
+                    if res: send_plot(txt, res[4], res[0], res[1], res[2], res[3])
+                    else: send_msg(f"❌ לא מצאתי נתונים עבור {txt}. וודא שהסימבול נכון (למשל NVDA או LUMI.TA)")
+        except: time.sleep(2)
 
 if __name__ == "__main__":
     Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
