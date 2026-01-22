@@ -76,7 +76,7 @@ def analyze_full_engine(symbol, spy_perf):
         support = df['Low'].tail(20).min()
         resistance = df['High'].tail(20).max()
 
-        if score >= 7: # רק איתותים באמינות גבוהה
+        if score >= 4: # רק איתותים באמינות גבוהה
             msg = (f"🚀 **איתות עוצמתי זוהה: {symbol}**\n"
                    f"🏆 **ציון חוזק: {score}/10**\n"
                    f"💰 מחיר: `{last['Close']:.2f}$`\n"
