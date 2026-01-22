@@ -14,7 +14,7 @@ CHAT_ID = "605543691"
 
 app = Flask('')
 @app.route('/')
-def home(): return "AI Trader Pro - Group Scanning Active"
+def home(): return "AI Trader Pro - Multisector Scanning Active"
 
 def send_msg(text):
     try: requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=10)
@@ -23,7 +23,7 @@ def send_msg(text):
 def send_plot(symbol, df, caption, levels=None):
     try:
         plt.figure(figsize=(12, 7))
-        # גרף מחיר וממוצעים
+        # גרף מחיר וממוצעים 50, 150, 200
         plt.plot(df.index[-150:], df['Close'].tail(150), label='Price', color='black', linewidth=1.5)
         plt.plot(df.index[-150:], df['SMA50'].tail(150), label='SMA 50', color='blue', alpha=0.6)
         plt.plot(df.index[-150:], df['SMA150'].tail(150), label='SMA 150', color='orange', alpha=0.6)
@@ -33,9 +33,9 @@ def send_plot(symbol, df, caption, levels=None):
             for l in levels:
                 plt.axhline(y=l, color='gray', linestyle='--', alpha=0.3)
 
-        plt.title(f"Detailed Analysis: {symbol}")
-        plt.legend(loc='upper left')
+        plt.title(f"Detailed Analysis: {symbol}", fontsize=14)
         plt.grid(True, alpha=0.1)
+        plt.legend(loc='best')
         
         buf = io.BytesIO()
         plt.savefig(buf, format='png', dpi=110)
@@ -61,14 +61,15 @@ def analyze_pro(symbol, spy_perf, min_score=3):
         score = 0
         details = []
 
-        # ניקוי וחישוב ניקוד
+        # ניקוד קבוע
         if last_p > df['SMA50'].iloc[-1]: score += 2; details.append("✅ מעל SMA50")
         if last_p > df['SMA150'].iloc[-1]: score += 2; details.append("✅ מעל SMA150")
         if last_p > df['SMA200'].iloc[-1]: score += 3; details.append("✅ מעל SMA200")
         
         perf_1m = (last_p / float(close.iloc[-21])) - 1
-        if perf_1m > spy_perf: score += 3; details.append("💪 חזקה מהשוק")
+        if perf_1m > spy_perf: score += 3; details.append("💪 חוזק יחסי חיובי")
 
+        # רמות תמיכה/התנגדות שנתיות
         sup = float(df['Low'].tail(252).min())
         res = float(df['High'].tail(252).max())
         
@@ -86,13 +87,13 @@ def analyze_pro(symbol, spy_perf, min_score=3):
     except: return None, 0, "", []
 
 def scanner():
-    # חלוקה לקבוצות לסריקה חכמה
+    # קבוצות מניות לסריקה מדורגת
     groups = [
-        ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL'], # טכנולוגיה 1
-        ['AMZN', 'META', 'NFLX', 'AMD', 'AVGO'],  # טכנולוגיה 2
-        ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA'], # בנקים ישראל
-        ['BEZQ.TA', 'ICL.TA', 'NICE.TA', 'AZRG.TA'], # ישראל נוספות
-        ['BTC-USD', 'ETH-USD', 'GC=F', 'CL=F', 'SI=F'] # קריפטו וסחורות
+        ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'GOOGL'], 
+        ['AMZN', 'META', 'NFLX', 'AMD', 'AVGO'],  
+        ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA'], 
+        ['BEZQ.TA', 'ICL.TA', 'NICE.TA', 'AZRG.TA'], 
+        ['BTC-USD', 'ETH-USD', 'GC=F', 'CL=F']
     ]
     
     current_group = 0
@@ -103,7 +104,7 @@ def scanner():
             spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[-21])) - 1
             
             tickers = groups[current_group]
-            send_msg(f"🛰️ סורק אוטומטי: מתחיל סבב קבוצה {current_group + 1}...")
+            send_msg(f"🛰️ **סורק:** סבב קבוצה {current_group + 1} יוצא לדרך...")
             
             for s in tickers:
                 df, score, msg, lvls = analyze_pro(s.replace('.', '-'), spy_perf)
@@ -111,8 +112,8 @@ def scanner():
                     send_plot(s, df, msg, lvls)
                 time.sleep(3)
             
-            current_group = (current_group + 1) % len(groups) # עובר לקבוצה הבאה
-            time.sleep(600) # מנוחה של 10 דקות בין קבוצות
+            current_group = (current_group + 1) % len(groups)
+            time.sleep(600) # מנוחה של 10 דקות בין סבבים
         except: time.sleep(60)
 
 def listen():
@@ -130,6 +131,7 @@ def listen():
                     spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[-21])) - 1
                     df, score, msg, lvls = analyze_pro(t, spy_perf, min_score=0)
                     if df is not None: send_plot(t, df, msg, lvls)
+                    else: send_msg(f"❌ לא נמצאו נתונים עבור {t}")
         except: time.sleep(2)
 
 if __name__ == "__main__":
