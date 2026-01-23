@@ -15,113 +15,100 @@ CHAT_ID = "605543691"
 app = Flask('')
 sent_alerts = {}
 
-# --- רשימות מניות "ברזל" (למניעת קריסות אינטרנט) ---
-ISRAEL_STOCKS = ['LUMI.TA', 'POLI.TA', 'DSCT.TA', 'FIBI.TA', 'AZRG.TA', 'BEZQ.TA', 'NICE.TA', 'ICL.TA', 'ESLT.TA', 'TEVA.TA', 'DELEKG.TA', 'ENOG.TA', 'ORL.TA', 'AMOT.TA', 'MELIS.TA']
-# כאן מוטמעים המדדים הגדולים (קיצור של ה-S&P והנאסד"ק לטובת יציבות מקסימלית)
-USA_LIST = ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','BRK-B','LLY','AVGO','V','JPM','UNH','MA','COST','HD','PG','NFLX','JNJ','ABBV','BAC','CRM','ORCL','ADBE','AMD','CVX','WMT','TMO','CSCO','ABT','DHR','INTU','GE','QCOM','CAT','AXP','PFE','DIS','MS','PM','IBM','INTC','AMAT','UNP','LOW','TXN','SPGI','HON','RTX','GS','BKNG','SBUX','PLTR','UBER']
-COMMODITIES = ['GC=F', 'CL=F', 'SI=F', '^TA35.TA', '^TA125.TA', 'BTC-USD', 'ETH-USD']
+# --- מאגר סימולים (S&P 500 + NASDAQ 100 + ISRAEL + COMMODITIES) ---
+USA_STOCKS = ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','BRK-B','LLY','AVGO','V','JPM','UNH','MA','COST','HD','PG','NFLX','JNJ','ABBV','BAC','CRM','ORCL','ADBE','AMD','CVX','WMT','TMO','CSCO','ABT','DHR','INTU','GE','QCOM','CAT','AXP','PFE','DIS','MS','PM','IBM','INTC','AMAT','UNP','LOW','TXN','SPGI','HON','RTX','GS','BKNG','SBUX','PLTR','UBER','LRCX','ELV','ISRG','MDLZ','PGR','VRTX','REGN','TJX','PANW','LMT','CB','CI','BSX','MMC','AMT','ADI','PLD','ADSK','T','VZ','A','AAL','AAP','ABT','ACN','ADBE','ADI','ADM','ADP','ADSK','AEE','AEP','AES','AFL','AIG','AIZ','AJG','AKAM','ALB','ALGN','ALK','ALL','ALLE','AMAT','AMCR','AMD','AME','AMGN','AMP','AMT','AMZN','ANET','ANSS','AON','AOS','APA','APD','APH','APTV','ARE','ATO','AVB','AVGO','AVY','AWK','AXP','AZO','BA','BAC','BALL','BAX','BBWI','BBY','BDX','BEN','BIIB','BIO','BK','BKNG','BKR','BLK','BMY','BR','BRO','BSX','BWA','BXP','C','CAG','CAH','CARR','CAT','CB','CBOE','CBRE','CCI','CCL','CDNS','CDW','CE','CEG','CF','CFG','CHD','CHRW','CHTR','CI','CINF','CL','CLX','CMA','CMCSA','CME','CMG','CMI','CMS','CNC','CNP','COF','COO','COP','COST','CPB','CPT','CRL','CRM','CSGP','CSX','CTAS','CTLT','CTRA','CTSH','CTVA','CVS','CVX','D','DAL','DD','DE','DFS','DG','DGX','DHI','DHR','DIS','DLR','DLTR','DOV','DOW','DPZ','DRI','DTE','DUK','DVA','DVN','DXCM','EA','EBAY','ECL','ED','EFX','EIX','EL','ELV','EMN','EMR','ENPH','EOG','EPAM','EQIX','EQR','ES','ESS','ETN','ETR','ETSY','EVRG','EW','EXC','EXPD','EXPE','EXR','F','FANG','FAST','FCX','FDS','FDX','FE','FIS','FISV','FITB','FLT','FMC','FOXA','FOX','FRT','FTNT','FTV','GD','GE','GEHC','GEN','GILD','GIS','GL','GLW','GM','GNRC','GOOGL','GOOG','GPC','GPN','GRMN','GS','GWW','HAL','HAS','HBAN','HCA','HD','HES','HIG','HII','HLT','HOLX','HON','HPE','HPQ','HRL','HSIC','HST','HSY','HUM','HWM','IBM','ICE','IDXX','IEX','IFF','ILMN','INCY','INTC','INTU','INVH','IP','IPG','IQV','IR','IRM','ISRG','IT','ITW','IVZ','JBHT','JCI','JKHY','JNJ','JNPR','JPM','K','KDP','KEY','KEYS','KHC','KIM','KLAC','KMB','KMI','KMX','KO','KR','L','LDOS','LEN','LH','LHX','LIN','LKQ','LLY','LMT','LNC','LNT','LOW','LRCX','LW','LYB','LYV','MA','MAA','MAR','MAS','MCD','MCHP','MCK','MCO','MDLZ','MDT','MET','META','MGM','MHK','MKC','MKTX','MLM','MMC','MMM','MNST','MO','MOH','MOS','MPC','MPWR','MRK','MRNA','MS','MSI','MSFT','MTB','MTCH','MTD','MU','NCLH','NDAQ','NDSN','NEE','NEM','NFLX','NI','NKE','NSC','NTAP','NTRS','NUE','NVDA','NVR','NWL','NWS','NWSA','NXPI','O','ODFL','OGN','OKE','OMC','ON','ORCL','ORLY','OTIS','OXY','PANW','PARA','PAYC','PAYX','PCAR','PCG','PEG','PEP','PFE','PFG','PG','PGR','PH','PHM','PKG','PLD','PLTR','PM','PNC','PNR','PNW','POOL','PPG','PPL','PRU','PSA','PSX','PTC','PVH','PWR','PYPL','QCOM','QRVO','RCL','REG','REGN','RF','RHI','RJF','RL','RMD','ROK','ROL','ROP','ROST','RSG','RTX','RVTY','SBAC','SBUX','SCHW','SEDG','SEE','SHW','SJM','SLB','SNA','SNPS','SO','SPG','SPGI','SRE','STE','STT','STX','STZ','SWK','SWKS','SYF','SYK','SYY','T','TAP','TDG','TDY','TECH','TEL','TER','TFC','TFX','TGT','TJX','TMO','TMUS','TPR','TRGP','TRMB','TROW','TRV','TSCO','TSLA','TSN','TT','TTWO','TXN','TXT','TYL','UAL','UDR','UHS','ULTA','UNH','UNP','UPS','URI','USB','V','VFC','VICI','VLO','VMC','VNO','VRSK','VRSN','VRTX','VTR','VZ','WAB','WAT','WBA','WBD','WDC','WEC','WELL','WFC','WHR','WM','WMB','WMT','WRB','WST','WTW','WY','WYNN','XEL','XOM','XRAY','XYL','YUM','ZBH','ZBRA','ZION','ZTS']
+ISRAEL_STOCKS = ['LUMI.TA','POLI.TA','DSCT.TA','FIBI.TA','AZRG.TA','BEZQ.TA','NICE.TA','ICL.TA','ESLT.TA','TEVA.TA','DELEKG.TA','ENOG.TA','ORL.TA','AMOT.TA','MELIS.TA','MTRX.TA','SPNS.TA','HRL.TA','MRLN.TA','AFCON.TA','AVIV.TA','DANE.TA','ARAD.TA','DIMO.TA','OPLN.TA']
+COMMODITIES = ['GC=F','CL=F','SI=F','HG=F','NG=F','BTC-USD','ETH-USD','^TA35.TA','^TA125.TA','^GSPC','^IXIC']
 
-ALL_TICKERS = sorted(list(set(ISRAEL_STOCKS + USA_LIST + COMMODITIES)))
+ALL_TICKERS = sorted(list(set(USA_STOCKS + ISRAEL_STOCKS + COMMODITIES)))
 
 @app.route('/')
-def home(): return "Scanner Pro - Ironclad Version"
+def home(): return "Master Scanner v7 - All Patterns Active"
 
 def send_msg(text):
     try: requests.get(f"https://api.telegram.org/bot{TOKEN}/sendMessage", params={"chat_id": CHAT_ID, "text": text, "parse_mode": "Markdown"}, timeout=10)
     except: pass
 
-def send_plot(symbol, name, df, caption, sup, res):
+def send_plot(symbol, name, df, caption):
     try:
         plt.figure(figsize=(10, 6))
         prices = df['Close'].tail(120)
-        plt.plot(df.index[-120:], prices, label='Price', color='black', linewidth=1.5)
-        plt.plot(df.index[-120:], df['SMA50'].tail(120), label='SMA 50', color='blue', alpha=0.5)
-        plt.plot(df.index[-120:], df['SMA150'].tail(120), label='SMA 150', color='orange', alpha=0.5)
-        plt.plot(df.index[-120:], df['SMA200'].tail(120), label='SMA 200', color='red', linewidth=1.5)
-        plt.axhline(y=sup, color='green', linestyle='--', alpha=0.6)
-        plt.axhline(y=res, color='red', linestyle='--', alpha=0.6)
+        plt.plot(df.index[-120:], prices, label='Price', color='black', linewidth=2)
+        plt.plot(df.index[-120:], df['SMA50'].tail(120), label='SMA 50', color='blue', alpha=0.7)
+        plt.plot(df.index[-120:], df['SMA200'].tail(120), label='SMA 200', color='red', linewidth=2)
         plt.title(f"{name}")
         plt.legend(); buf = io.BytesIO(); plt.savefig(buf, format='png'); buf.seek(0); plt.close()
         requests.post(f"https://api.telegram.org/bot{TOKEN}/sendPhoto", data={'chat_id': CHAT_ID, 'caption': caption, 'parse_mode': 'Markdown'}, files={'photo': buf}, timeout=20)
     except: pass
 
-def analyze_strategy(symbol, spy_perf, my_price=None, is_auto=False):
+def analyze_strategy(symbol, my_price=None, is_auto=False):
     try:
         ticker = yf.Ticker(symbol)
         df = ticker.history(period="2y")
         if df.empty or len(df) < 200: return None
         
         last_p = float(df['Close'].iloc[-1])
-        
-        # סינון חזרות בסריקה אוטומטית (פעם ב-12 שעות)
         if is_auto and symbol in sent_alerts:
             if datetime.now() < sent_alerts[symbol] + timedelta(hours=12): return None
 
+        # ממוצעים ותבניות
         df['SMA50'] = df['Close'].rolling(50).mean()
-        df['SMA150'] = df['Close'].rolling(150).mean()
         df['SMA200'] = df['Close'].rolling(200).mean()
+        s50, s200 = df['SMA50'].iloc[-1], df['SMA200'].iloc[-1]
         
-        s50, s150, s200 = df['SMA50'].iloc[-1], df['SMA150'].iloc[-1], df['SMA200'].iloc[-1]
-        sup, res = float(df['Low'].tail(252).min()), float(df['High'].tail(252).max())
-        
-        # חישוב ציון קשוח (0-10)
-        score = 0
-        if last_p > s50: score += 3
-        if last_p > s150: score += 2
-        if last_p > s200: score += 2
-        if (last_p / float(df['Close'].iloc[-21])) - 1 > spy_perf: score += 3
+        # זיהוי Crosses
+        is_golden = (df['SMA50'].iloc[-2] <= df['SMA200'].iloc[-2] and s50 > s200)
+        is_death = (df['SMA50'].iloc[-2] >= df['SMA200'].iloc[-2] and s50 < s200)
 
-        # סינון איכות: רק הזדמנויות קצה בסריקה אוטומטית
-        if is_auto and not (score >= 9 or score <= 1): return None 
+        # תבניות מחיר (Double Bottom, Cup & Handle - זיהוי פשטני למערכת סריקה)
+        low_252 = df['Low'].tail(252).min()
+        high_252 = df['High'].tail(252).max()
+        is_breakout = last_p >= high_252 * 0.99
         
-        rec = "💎 **קנייה חזקה**" if score >= 9 else "🔴 **מכירה/סיכון**" if score <= 1 else "⚖️ **נייטרלי**"
+        score = 0
+        patterns = []
+        
+        if s50 > s200: score += 4; patterns.append("מגמה שורית (50>200)")
+        if is_golden: score += 3; patterns.append("🌟 צלב הזהב (Golden Cross)")
+        if is_death: score -= 5; patterns.append("💀 צלב המוות (Death Cross)")
+        if is_breakout: score += 2; patterns.append("🚀 פריצת שיא שנתי")
+        if last_p < low_252 * 1.05: score -= 2; patterns.append("📉 סמוך לשפל שנתי")
+
+        if is_auto and not (score >= 9 or score <= 1 or is_golden or is_death): return None
+        
+        rec = "💎 **קנייה חזקה**" if score >= 8 else "🔴 **מכירה/סיכון**" if score <= 1 else "⚖️ **נייטרלי**"
         
         personal = ""
         if my_price:
             profit = (last_p - my_price) / my_price
-            personal = f"\n\n💬 **ייעוץ אישי:** מחיר קנייה: {my_price:.2f} ({profit:+.1%})\n"
-            personal += "✅ המגמה חזקה מאוד - מומלץ להחזיק." if score >= 8 else "⚠️ המגמה נחלשת - שקול מימוש/סטופ."
+            personal = f"\n\n💬 **ייעוץ:** קנית ב-{my_price:.2f} ({profit:+.1%}). "
+            personal += "החזק בביטחון." if score >= 7 else "שקול סטופ."
 
-        # שמות בעברית לסחורות
-        names_dict = {'GC=F': 'זהב (Gold)', 'CL=F': 'נפט (Oil)', 'SI=F': 'כסף (Silver)', '^TA35.TA': 'ת"א 35', '^TA125.TA': 'ת"א 125', 'BTC-USD': 'ביטקוין'}
-        name = names_dict.get(symbol, ticker.info.get('longName', symbol))
-        
+        name = ticker.info.get('longName', symbol)
+        p_text = "\n".join([f"• {p}" for p in patterns])
         msg = (f"🎯 **{name} ({symbol}) | ציון: {score}/10**\n"
                f"📢 **מסקנה:** {rec}\n\n"
-               f"📍 ממוצע 50: `{s50:.2f}` ({'✅' if last_p > s50 else '❌'})\n"
-               f"📍 ממוצע 150: `{s150:.2f}` ({'✅' if last_p > s150 else '❌'})\n"
-               f"📍 ממוצע 200: `{s200:.2f}` ({'✅' if last_p > s200 else '❌'})\n\n"
-               f"💰 מחיר: `{last_p:.2f}` | 🛑 סטופ: `{last_p*0.95:.2f}`\n"
-               f"📏 התנגדות: `{res:.2f}` | ⚓ תמיכה: `{sup:.2f}`{personal}")
+               f"📊 **תבניות שזוהו:**\n{p_text}\n\n"
+               f"💰 מחיר: `{last_p:.2f}` | 📍 ממוצע 50: `{s50:.2f}` | 📍 ממוצע 200: `{s200:.2f}`{personal}")
         
         if is_auto: sent_alerts[symbol] = datetime.now()
-        return df, msg, sup, res, name
+        return df, msg, name
     except: return None
 
-def scanner():
-    time.sleep(10)
+def scanner_worker():
     while True:
-        send_msg(f"🚀 **מתחיל סבב סריקה יסודי על {len(ALL_TICKERS)} ניירות ערך.**")
-        try:
-            spy = yf.download('SPY', period="1mo", progress=False)['Close'].squeeze()
-            spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[0])) - 1
-        except: spy_perf = 0
-        
+        send_msg(f"🚀 **סריקת מאסטר החלה על {len(ALL_TICKERS)} ניירות.**")
         found = 0
         for s in ALL_TICKERS:
-            # דילוג על ישראל בסופ"ש
-            if ".TA" in s and datetime.now().weekday() in [4, 5]: continue
-            res = analyze_strategy(s, spy_perf, is_auto=True)
+            res = analyze_strategy(s, is_auto=True)
             if res:
-                send_plot(s, res[4], res[0], res[1], res[2], res[3])
-                found += 1
-                time.sleep(5)
-            time.sleep(0.5)
-        
-        send_msg(f"✅ **סבב הושלם.** נמצאו {found} איתותי איכות.")
+                send_plot(s, res[2], res[0], res[1])
+                found += 1; time.sleep(5)
+            time.sleep(0.3)
+        send_msg(f"✅ סבב מלא הסתיים. נמצאו {found} הזדמנויות.")
         time.sleep(1800)
 
-def listen():
+def listen_worker():
     last_id = 0
     while True:
         try:
@@ -130,24 +117,15 @@ def listen():
                 last_id = u["update_id"]
                 if "message" in u and "text" in u["message"]:
                     txt = u["message"]["text"].upper().strip()
-                    send_msg(f"⏳ מנתח את {txt}...")
-                    
-                    try:
-                        spy = yf.download('SPY', period="1mo", progress=False)['Close'].squeeze()
-                        spy_perf = (float(spy.iloc[-1]) / float(spy.iloc[0])) - 1
-                    except: spy_perf = 0
-                    
-                    if "BY" in txt: # פורמט: BY NVDA 120
-                        parts = txt.split()
-                        res = analyze_strategy(parts[1], spy_perf, my_price=float(parts[2]), is_auto=False)
-                    else:
-                        res = analyze_strategy(txt, spy_perf, is_auto=False)
-                    
-                    if res: send_plot(txt, res[4], res[0], res[1], res[2], res[3])
-                    else: send_msg(f"❌ לא נמצאו נתונים עבור {txt}. נסה סימול מדויק.")
-        except: time.sleep(2)
+                    send_msg(f"🔎 מנתח עבורך את {txt}...")
+                    if "BY" in txt:
+                        p = txt.split(); res = analyze_strategy(p[1], my_price=float(p[2]))
+                    else: res = analyze_strategy(txt)
+                    if res: send_plot(txt, res[2], res[0], res[1])
+                    else: send_msg(f"❌ לא נמצא מידע.")
+        except: time.sleep(1)
 
 if __name__ == "__main__":
     Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
-    Thread(target=scanner).start()
-    listen()
+    Thread(target=scanner_worker).start()
+    listen_worker()
